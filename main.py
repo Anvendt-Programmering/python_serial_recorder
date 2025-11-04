@@ -38,7 +38,7 @@ try:
         QFileDialog,
         QTextEdit,
     )
-    from PySide6.QtCore import QTimer, Qt
+    from PySide6.QtCore import QTimer, Qt, QEvent
     from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     import matplotlib.pyplot as plt
@@ -56,10 +56,10 @@ except ImportError as e:
     logging.error(f"Error importing module: {e}\n")
     # Verify that the version of python is 3.13.x
     required_version = (3, 13, 2)
-    # Verify that the version of python is 3.13.2
+    # Verify that the version of python is 3.13.7
     if sys.version_info[:3] != required_version:
         logging.error(f"Python {'.'.join(map(str, required_version))} is required.\n")
-    logging.error("Run 'pip install -r requirements.txt'")
+    logging.error("Run 'uv sync'")
     sys.exit(1)
 
 if darkdetect.isDark():
@@ -82,7 +82,9 @@ def main() -> None:
     controller = Controller(model, view, update_rate_ms=100)
     view.set_controller(controller=controller)
     main_window.setCentralWidget(view)
-    main_window.setFocusPolicy(Qt.StrongFocus)  # Ensures widget captures all key events
+    main_window.setFocusPolicy(
+        Qt.FocusPolicy.StrongFocus
+    )  # Ensures widget captures all key events
     main_window.setFocus()  # Forces focus onto the widget
     main_window.show()
     app.exec()
@@ -103,7 +105,7 @@ class Controller:
         self.update_available_ports()
         QTimer.singleShot(dt_ms, self.waiting_for_port_selection)
 
-    def update_available_ports(self, dt_ms=100) -> list[str]:
+    def update_available_ports(self, dt_ms=100):
         """Get the list of available COM ports and update the view."""
         available_ports = self.model.get_available_ports()
         QTimer.singleShot(
@@ -123,6 +125,7 @@ class Controller:
 
     def update_graph(self, dt_ms=1000 * 1 / 50) -> None:
         """Create a thread to periodically update data if new data is available."""
+        dt_ms = int(dt_ms)
 
         def graph_updating_thread():
             if self.model.is_disconnected:
@@ -180,11 +183,11 @@ class View(QWidget):
         """Handle key press events."""
 
         match event.key():
-            case Qt.Key_Space:
+            case Qt.Key.Key_Space:
                 # pause / resume
                 self.controller.snapshot_show()
 
-            case Qt.Key_S:
+            case Qt.Key.Key_S:
                 # Save current snapshot (or freeze then save)
                 self.controller.save_snapshot()
 
@@ -196,7 +199,9 @@ class View(QWidget):
         """Set up the UI elements."""
 
         control_layout = QHBoxLayout()
-        self.layout().addLayout(control_layout)
+        main_layout = self.layout()
+        assert isinstance(main_layout, QVBoxLayout)
+        main_layout.addLayout(control_layout)
 
         selection_layout = QVBoxLayout()
         control_layout.addLayout(selection_layout)
@@ -221,7 +226,7 @@ class View(QWidget):
 
         BAUDRATE_OPTIONS = [9600, 115200, 256000, 512000, 921600]
         self.baudrate = QComboBox()
-        self.baudrate.addItems(map(str, BAUDRATE_OPTIONS))
+        self.baudrate.addItems(list(map(str, BAUDRATE_OPTIONS)))
         self.baudrate.setCurrentText("921600")
         selection_layout.addWidget(self.baudrate)
 
@@ -247,7 +252,8 @@ class View(QWidget):
         self.ax.set_ylabel("ADC Output")
         self.ax.grid(True)
         self.canvas = FigureCanvas(self.fig)
-        self.layout().addWidget(self.canvas)
+
+        main_layout.addWidget(self.canvas)
 
         # logging area
         self.setup_logger()
@@ -320,12 +326,18 @@ class View(QWidget):
         """Disable buttons and dropdowns, and activate keybindings."""
 
         # Create a QShortcut for the spacebar key press
-        evt = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Space, Qt.NoModifier)
-        space_shortcut = QShortcut(QKeySequence(Qt.Key_Space), self.master)
+        evt = QKeyEvent(
+            QEvent.Type.KeyPress,
+            Qt.Key.Key_Space,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        space_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.master)
         space_shortcut.activated.connect(lambda evt=evt: self.on_key_press(evt))
 
-        evt = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_S, Qt.NoModifier)
-        s_shortcut = QShortcut(QKeySequence(Qt.Key_S), self.master)
+        evt = QKeyEvent(
+            QEvent.Type.KeyPress, Qt.Key.Key_S, Qt.KeyboardModifier.NoModifier
+        )
+        s_shortcut = QShortcut(QKeySequence(Qt.Key.Key_S), self.master)
         s_shortcut.activated.connect(lambda evt=evt: self.on_key_press(evt))
 
         self.keyPressEvent = self.on_key_press
@@ -336,9 +348,12 @@ class View(QWidget):
 
     def setup_logger(self):
         """Set up the logging system to write to the QTextEdit widget."""
+
+        main_layout = self.layout()
+        assert isinstance(main_layout, QVBoxLayout)
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
-        self.layout().addWidget(self.log_area)
+        main_layout.addWidget(self.log_area)
 
         # Create a custom logging handler
         class TextHandler(logging.Handler):
@@ -347,7 +362,7 @@ class View(QWidget):
                 self.widget = widget
 
             def emit(self, record):
-                if not self.widget.parent().isVisible():
+                if not self.widget.isVisible():
                     return
                 log_entry = self.format(record)
                 self.widget.append(log_entry)
@@ -400,7 +415,7 @@ class Model:
     ):
         """Continuously read data from the serial port in a background thread."""
         rest, counter = "", 0
-        if self.is_connected:
+        if self.serial_connection and self.is_connected:
             self.serial_connection.flush()
             self.serial_connection.read()
 
@@ -441,11 +456,16 @@ class Model:
 
     def get_available_bytes(self) -> int:
         """Get the number of available bytes in the serial connection."""
-        return self.serial_connection.in_waiting
+        if self.serial_connection:
+            return self.serial_connection.in_waiting
+        else:
+            return 0
 
     def read_serial_data(self, available_bytes: int, rest: str) -> str | None:
         """Read data from the serial connection and decode it."""
         try:
+            if self.serial_connection is None:
+                return None
             bytes = self.serial_connection.read(available_bytes)
             return rest + bytes.decode()
         except UnicodeDecodeError:
@@ -481,7 +501,7 @@ class Model:
 
     def close_connection(self) -> None:
         """Close the serial connection."""
-        if self.is_connected:
+        if self.is_connected and self.serial_connection:
             self.serial_connection.close()
 
     def get_available_ports(self) -> list[str]:
@@ -503,11 +523,12 @@ class Model:
     @property
     def is_connected(self) -> bool:
         """Check if the serial connection is established."""
-        b = (
-            self.serial_connection
-            and self.serial_connection.is_open
-            and self.read_thread.is_alive()
-        )
+        if self.serial_connection is None:
+            return False
+        if self.read_thread is None:
+            return False
+
+        b = self.serial_connection.is_open and self.read_thread.is_alive()
         return b
 
     @property
@@ -536,7 +557,9 @@ def process_serial_data(ascii_data: str) -> tuple[str, list[list[int]]]:
 
 def str_contains_only_numbers(row: str) -> bool:
     """Check if a string contains only numbers and spaces."""
-    return row and all(c.isdigit() or c == " " for c in row)
+    if not row:
+        return False
+    return row.replace(" ", "").isdigit()
 
 
 def str_to_intarray(data: str) -> list[int]:

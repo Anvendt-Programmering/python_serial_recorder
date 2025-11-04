@@ -15,11 +15,8 @@ Use the following guides to install a package manager if you do not already have
 
 ## git
 - Install Git on your system. This is a way to download other peoples projects.
-
-   ```bash
-      brew install git
-      choco install git
-   ```
+   - MacOS: `brew install git`
+   - Windows: `choco install git`
 
 - Git gui: https://desktop.github.com/download/
 
@@ -32,15 +29,8 @@ This program works with Python 3.13.2.
 
 1. Option 1: download and use the installer from www.python.org
 2. Option 3: Use package manager. Pick the package manager you have installed on your system. If you dont have it, you can install one from their respective websites.  
-   - MacOS
-   ```bash
-      brew install python
-   ```
-   - Windows
-   ```bash 
-      choco install python
-      
-   ```
+   - MacOS: `brew install uv`
+   - Windows:   `choco install uv`
 
 ## how to install python packages via pip
 
@@ -59,13 +49,11 @@ For MacOS and Windows.
    cd python_serial_recorder
    ```
       
-2. Install new python environment (will avoid problems in the future)
+2. Install new python environment (will avoid problems in the future), write the following in the terminal: 
    
-    ```bash
-    python -m ensurepip --default-pip
-    python -m pip install --upgrade pip setuptools wheel
-    python -m venv .venv
-    ```
+   ```bash   
+   uv sync
+   ```
     
 4. activate python environment
    - Depending on if it is not already activated when you open a terminal in VS Code, you can do the following.
@@ -80,16 +68,14 @@ For MacOS and Windows.
         source .venv/Scripts/activate  
      ```
 
-5. install program requirements via reqirements.txt
-    ```bash
-    pip install -r requirements.txt
-    ```
+- Note: there is also a requirements file, that you might use. if you do not wish to use UV!
 
 ## Updating The Repository
 
 - In case of changes, the newest version of the repository can be updated using the following terminal text, from within the `python_serial_recorder` folder
 ```bash
       git pull
+      uv sync
    ```
 that's it.
 
@@ -97,8 +83,15 @@ that's it.
 # Run
 The Python script is running the following code in the terminal, while inside the main python_serial_recorder folder.
 
-```zsh
+```bash
+uv run main.py
+```
+
+or
+
+```bash
 python main.py
 ```
+
 
 
