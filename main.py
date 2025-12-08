@@ -25,6 +25,23 @@ Copyright (c) 2024 A Curious Clincal Programmer
 import logging
 from pathlib import Path
 import re
+import sys
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+    filename="log.log",
+)
+# Verify that the version of python is 3.13.x
+REQUIRED_MAJOR = 3
+REQUIRED_MINOR = 13
+if sys.version_info == (REQUIRED_MAJOR, REQUIRED_MINOR):
+    logging.warning(
+        f"This script requires Python {REQUIRED_MAJOR}.{REQUIRED_MINOR}.x "
+        f"(current: {sys.version_info.major}.{sys.version_info.minor}).x"
+        f"If errors occur, run 'uv sync'"
+    )
 
 try:
     from PySide6.QtWidgets import (
@@ -53,16 +70,9 @@ try:
     import darkdetect
 
 except ImportError as e:
-    import sys
-
     logging.error(f"Error importing module: {e}\n")
-    # Verify that the version of python is 3.13.x
-    required_version = (3, 13)
-    # Verify that the version of python is 3.13.x
-    if sys.version_info[:2] != required_version:
-        logging.error(f"Python {'.'.join(map(str, required_version))} is required.\n")
     logging.error("Run 'uv sync'")
-    sys.exit(1)
+    raise e
 
 
 # Set Matplotlib theme based on the OS theme
@@ -623,11 +633,7 @@ def save_timeseries(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-        filename="log.log",
-    )
+
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(
