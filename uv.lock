@@ -487,12 +487,12 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "darkdetect", specifier = ">=0.8.0" },
-    { name = "matplotlib", specifier = ">=3.10.7" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pyserial", specifier = ">=3.5" },
-    { name = "pyside6", specifier = ">=6.10.0" },
+    { name = "darkdetect" },
+    { name = "matplotlib" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "pyserial" },
+    { name = "pyside6" },
 ]
 
 [[package]]

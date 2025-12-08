@@ -23,6 +23,8 @@ Copyright (c) 2024 A Curious Clincal Programmer
 """
 
 import logging
+from pathlib import Path
+import re
 
 try:
     from PySide6.QtWidgets import (
@@ -55,18 +57,19 @@ except ImportError as e:
 
     logging.error(f"Error importing module: {e}\n")
     # Verify that the version of python is 3.13.x
-    required_version = (3, 13, 2)
-    # Verify that the version of python is 3.13.7
-    if sys.version_info[:3] != required_version:
+    required_version = (3, 13)
+    # Verify that the version of python is 3.13.x
+    if sys.version_info[:2] != required_version:
         logging.error(f"Python {'.'.join(map(str, required_version))} is required.\n")
     logging.error("Run 'uv sync'")
     sys.exit(1)
 
+
+# Set Matplotlib theme based on the OS theme
 if darkdetect.isDark():
     plt.style.use(
         "https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-dark.mplstyle"
     )
-
 else:
     plt.style.use("ggplot")
 
@@ -76,7 +79,7 @@ def main() -> None:
     app = QApplication([])
     main_window = QMainWindow()
     main_window.setWindowTitle("Serial Data Viewer")
-    main_window.resize(800, 800)
+    main_window.resize(1000, 800)
     model = Model()
     view = View(master=main_window)
     controller = Controller(model, view, update_rate_ms=100)
@@ -160,7 +163,7 @@ class Controller:
             logging.error("Nothing to save, unfreezing.")
             logging.warning("Attempted to save an empty snapshot.")
             return
-        QTimer.singleShot(1, lambda: open_filesave_dialog(df))
+        QTimer.singleShot(1, lambda: save_timeseries(df))
 
     @property
     def is_running(self):
@@ -211,7 +214,7 @@ class View(QWidget):
 
         keybindings_layout.addWidget(
             QLabel(
-                "Key Bindings:\n    [Space]: Freeze / Unfreeze\n    [S]: Save data to file"
+                "Key Bindings:\n\t[Space]: Freeze / Unfreeze\n\t[S]: Save data to file"
             )
         )
 
@@ -227,16 +230,15 @@ class View(QWidget):
         BAUDRATE_OPTIONS = [9600, 115200, 256000, 512000, 921600]
         self.baudrate = QComboBox()
         self.baudrate.addItems(list(map(str, BAUDRATE_OPTIONS)))
-        self.baudrate.setCurrentText("921600")
+        self.baudrate.setCurrentText(str(BAUDRATE_OPTIONS[-1]))
         selection_layout.addWidget(self.baudrate)
 
         lbl = QLabel("Select Number of samples (per channel):")
         selection_layout.addWidget(lbl)
 
-        self.samples_per_channel = QSpinBox()
-        self.samples_per_channel.setRange(10, 100000)
-        self.samples_per_channel.setSingleStep(100)
-        self.samples_per_channel.setValue(2000)
+        self.samples_per_channel = QSpinBox(
+            minimum=10, maximum=100000, singleStep=100, value=2000
+        )
         selection_layout.addWidget(self.samples_per_channel)
 
         self.connect_button = QPushButton("Connect")
@@ -265,34 +267,30 @@ class View(QWidget):
             for line in self.lines:
                 line.remove()
             self.lines.clear()
-            for idx, name in enumerate(data.columns):
+            for idx, channel in enumerate(data.columns):
                 line = Line2D(
                     xdata=data.index,
-                    ydata=data[name],
-                    label=name,
+                    ydata=data[channel],
+                    label=channel,
                     color=COLORS[idx % len(COLORS)],
                 )
                 self.lines.append(line)
                 self.ax.add_line(line)
 
-            if not self.ax.get_legend():
-                self.ax.legend(loc="upper left")
+            self.ax.legend(loc="upper left")
         else:
-            for name, line in zip(data.columns, self.lines):
-                line.set_data(data.index.to_list(), data[name])
+            for channel, line in zip(data.columns, self.lines):
+                line.set_data(data.index, data[channel])
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
-        1
 
     def on_connect(self):
         """Connect to the selected COM port and baudrate."""
         try:
-            port, baudrate, samples_per_channel = (
-                self.port.currentText(),
-                int(self.baudrate.currentText()),
-                self.samples_per_channel.value(),
-            )
+            port = self.port.currentText()
+            baudrate = int(self.baudrate.currentText())
+            samples_per_channel = int(self.samples_per_channel.value())
             if not port:
                 raise ValueError("Please select a COM port.")
             if baudrate <= 0:
@@ -432,7 +430,7 @@ class Model:
                 )
                 return
 
-            if not available_bytes:
+            if not available_bytes:  # If there are no available bytes to read
                 if ok:
                     t0 = time.time()
 
@@ -559,12 +557,12 @@ def str_contains_only_numbers(row: str) -> bool:
     """Check if a string contains only numbers and spaces."""
     if not row:
         return False
-    return row.replace(" ", "").isdigit()
+    return bool(re.fullmatch(r"\s*\d+( \d+)*\s*", row))
 
 
 def str_to_intarray(data: str) -> list[int]:
     """Convert a string of numbers separated by spaces to a list of integers."""
-    return list(map(int, data.split(" ")))
+    return list(map(int, data.split()))
 
 
 def calculate_2D_matrix(data: list[list[int]]) -> tuple[int, int]:
@@ -574,29 +572,54 @@ def calculate_2D_matrix(data: list[list[int]]) -> tuple[int, int]:
     return num_rows, num_cols
 
 
-def open_filesave_dialog(df: pd.DataFrame):
-    file_dialog = QFileDialog()
-    file_path, _ = file_dialog.getSaveFileName(
+def save_timeseries(df: pd.DataFrame):
+    filters = (
+        "Excel files (*.xlsx);;"
+        "CSV files (*.csv);;"
+        "JSON files (*.json);;"
+        "All files (*.*)"
+    )
+
+    file_path, selected_filter = QFileDialog.getSaveFileName(
         None,
         "Save Timeseries",
         "",
-        "Excel files (*.xlsx);;CSV files (*.csv);;JSON files (*.json);;All files (*.*)",
+        filters,
     )
-    if file_path == "":
-        return
-    if file_path.endswith(".csv"):
-        df.to_csv(file_path, index=True)
-        msg = f"Data saved as CSV to {file_path}"
-    elif file_path.endswith(".xlsx"):
-        df.to_excel(file_path, index=True)
-        msg = f"Data saved as Excel to {file_path}"
-    elif file_path.endswith(".json"):
-        df.to_json(file_path, orient="records", lines=True)
-        msg = f"Data saved as JSON to {file_path}"
+
+    if not file_path:
+        return  # User cancelled
+
+    path = Path(file_path)
+
+    # Extract extension from selected filter, e.g. "*.xlsx" -> ".xlsx"
+    if selected_filter:
+        ext = selected_filter.split("(")[1].split(")")[0].replace("*", "").strip()
     else:
-        logging.error("Invalid file format. Please save as CSV, Excel, or JSON.")
+        ext = path.suffix
+
+    # Ensure the file has an extension
+    if not path.suffix and ext:
+        path = path.with_suffix(ext)
+
+    ext = path.suffix.lower()
+
+    # Map extensions to writers
+    writers = {
+        ".csv": lambda p: df.to_csv(p, index=True, index_label="index"),
+        ".xlsx": lambda p: df.to_excel(p, index=True, index_label="index"),
+        ".json": lambda p: df.reset_index()
+        .rename(columns={"index": "index"})
+        .to_json(p, orient="records", lines=True),
+    }
+
+    writer = writers.get(ext)
+    if not writer:
+        logging.error(f"Unsupported file extension: {ext}")
         return
-    logging.info(msg)
+
+    writer(path)
+    logging.info(f"Data saved to {path}")
 
 
 if __name__ == "__main__":
