@@ -41,7 +41,7 @@ Install the following elements:
 
 Use the following guides to install a package manager if you do not already have one installed.
 
-- for Windows : https://chocolatey.org/install
+- for Windows : winget (Er indbygget i Windows11)
 - for MacOS : https://brew.sh/
 
 ## Install Git
