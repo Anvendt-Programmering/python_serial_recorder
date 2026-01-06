@@ -48,7 +48,7 @@ Use the following guides to install a package manager if you do not already have
 
 While not strictly necessary, it is greatly advised to use git. Also besides classes.
    - MacOS: `brew install git`
-   - Windows: `choco install git`
+   - Windows: `winget install --id Git.Git -e --source winget`
 
 ## Install Python version > 3.14
 Install Python using the following guide: https://github.com/AAU-Python-Guides/install_python_guide
