@@ -1,4 +1,5 @@
 // Author: Steffen Frahm, ksf@hst.aau.dk
+// Modified by: Martin Siemienski Andersen, mvan@hst.aau.dk
 hw_timer_t* timer = NULL;
 
 
