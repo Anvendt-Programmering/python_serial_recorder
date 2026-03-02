@@ -30,7 +30,9 @@ If you have Conda on your ystem:
 # Run program
 
 If UV is installed on your system:
-   - `uv run main.py`
+   ```bash
+   uv run main.py`
+   ```
 
 
 Otherwise: Ensure that your installed python interpreter is selected, could be `conda activate python-serial-recorder`. then:
