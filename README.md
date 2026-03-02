@@ -18,7 +18,7 @@ Included is an Arduino script for a esp32 to send data from a number of ports, t
 
 If UV is installed on your system:
    ```bash
-   uv run main.py`
+   uv run main.py
    ```
 If you have Conda on your ystem:
    ```bash
