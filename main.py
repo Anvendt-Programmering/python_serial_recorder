@@ -31,7 +31,7 @@ import sys
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-    filename="log.log",
+    filename=Path("files/log.log"),
 )
 # Verify that the version of python is 3.13.x
 REQUIRED_MAJOR = 3
