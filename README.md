@@ -5,10 +5,6 @@ Included is an Arduino script for a esp32 to send data from a number of ports, t
 
 
 # Installation
-If UV is installed on your system:
-   - `uv run main.py`
-
-If you have Conda on your ystem:
 1. Download git repository
 
    ```bash
@@ -17,8 +13,13 @@ If you have Conda on your ystem:
    cd python_serial_recorder
    ```
 
+
 2. Install Required Packages
 
+If UV is installed on your system:
+   - `uv run main.py`
+
+If you have Conda on your ystem:
    ```bash
    conda create -n python-serial-recorder python=3.14.2 -y
    conda activate python-serial-recorder
