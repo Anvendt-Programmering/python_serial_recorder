@@ -31,7 +31,7 @@ If you have Conda on your ystem:
 
 If UV is installed on your system:
    ```bash
-   uv run main.py`
+   uv run main.py
    ```
 
 
