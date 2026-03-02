@@ -19,7 +19,6 @@ For MacOS and Windows.
 2. Install Required Packages
 
    ```bash
-   conda
    conda create -n python-serial-recorder python=3.14.2 -y
    conda activate python-serial-recorder
    pip install -r requirements.txt
