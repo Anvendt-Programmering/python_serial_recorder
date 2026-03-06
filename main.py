@@ -27,11 +27,13 @@ from pathlib import Path
 import re
 import sys
 
+# first ensure that the log directory exists
+Path("logs").mkdir(exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-    filename=Path("files/log.log"),
+    filename=Path("logs/log.log"),
 )
 # Verify that the version of python is 3.13.x
 REQUIRED_MAJOR = 3
