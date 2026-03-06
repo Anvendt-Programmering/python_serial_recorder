@@ -5,8 +5,8 @@ Python Serial Recorder
 This program is a graphical user interface (GUI) application that allows users to view and record data from a serial port in real-time.
 It follows the Model-View-Controller (MVC) design pattern to separate concerns and improve maintainability.
 
-- Model: Handles the data and serial communication.
-- View: Manages the graphical user interface using Tkinter and Matplotlib.
+- Model: Handles the data and serial communication using pyserial.
+- View: Manages the graphical user interface using pyside6 and Matplotlib.
 - Controller: Coordinates between the Model and View, handling user interactions and updating the view with new data.
 
 Features:
