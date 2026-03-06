@@ -1,6 +1,5 @@
 #!.venv/bin/python
 """
-
 Python Serial Recorder
 
 This program is a graphical user interface (GUI) application that allows users to view and record data from a serial port in real-time.
@@ -19,65 +18,73 @@ Features:
 
 Author: Martin Siemienski Andersen, Aalborg University, Aalborg, Denmark
 Copyright (c) 2024 A Curious Clincal Programmer
-
 """
-
 import logging
 from pathlib import Path
 import re
 import sys
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QPushButton,
+    QSpinBox,
+    QFileDialog,
+    QTextEdit,
+)
+from PySide6.QtCore import QTimer, Qt, QEvent
+from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+import serial
+import threading
+import time
+import pandas as pd
+from matplotlib.lines import Line2D
+import serial.tools.list_ports as list_ports
+import darkdetect
 
-# first ensure that the log directory exists
+# Setup Logging
 Path("logs").mkdir(exist_ok=True)
-
+logging_format = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+    format=logging_format,
     filename=Path("logs/log.log"),
 )
-# Verify that the version of python is 3.13.x
-REQUIRED_MAJOR = 3
-REQUIRED_MINOR = 13
-if sys.version_info == (REQUIRED_MAJOR, REQUIRED_MINOR):
-    logging.warning(
-        f"This script requires Python {REQUIRED_MAJOR}.{REQUIRED_MINOR}.x "
-        f"(current: {sys.version_info.major}.{sys.version_info.minor}).x"
-        f"If errors occur, run 'uv sync'"
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(
+    logging.Formatter(
+        logging_format
     )
+)
+logging.getLogger().addHandler(console_handler)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+# Ensure suggested python version
 try:
-    from PySide6.QtWidgets import (
-        QApplication,
-        QMainWindow,
-        QWidget,
-        QVBoxLayout,
-        QHBoxLayout,
-        QLabel,
-        QComboBox,
-        QPushButton,
-        QSpinBox,
-        QFileDialog,
-        QTextEdit,
+    with open(".python-version", "r") as f:
+        version_str = f.read().strip()
+        SUGGESTED_PY_VERSION = tuple(map(int, version_str.split(".")))
+except FileNotFoundError as e:
+    logging.error(f"Could not find .python-version file. Using default version (3.14.2). Error: {e}")
+    SUGGESTED_PY_VERSION = (3, 14, 2)
+if (sys.version_info.major, sys.version_info.minor, sys.version_info.micro) != SUGGESTED_PY_VERSION:
+    logging.warning(
+        f"This script is designed for Python {SUGGESTED_PY_VERSION[0]}.{SUGGESTED_PY_VERSION[1]}.{SUGGESTED_PY_VERSION[2]}"
+        f" (current: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}) might cause unexpected behavior or errors."
+        f" If errors occur, run 'uv sync', or update to the suggested python version."
     )
-    from PySide6.QtCore import QTimer, Qt, QEvent
-    from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    import matplotlib.pyplot as plt
-    import serial
-    import threading
-    import time
-    import pandas as pd
-    from matplotlib.lines import Line2D
-    import serial.tools.list_ports as list_ports
-    import darkdetect
-
-except ImportError as e:
-    logging.error(f"Error importing module: {e}\n")
-    logging.error("Run 'uv sync'")
-    raise e
 
 
 # Set Matplotlib theme based on the OS theme
+print(plt.style.available)
 if darkdetect.isDark():
     plt.style.use(
         "https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-dark.mplstyle"
@@ -636,16 +643,7 @@ def save_timeseries(df: pd.DataFrame):
 
 if __name__ == "__main__":
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-        )
-    )
-    logging.getLogger().addHandler(console_handler)
-    logging.getLogger("PIL").setLevel(logging.WARNING)
-    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    
 
     logging.info("Starting Serial Recorder...")
     main()
