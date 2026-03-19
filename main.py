@@ -21,82 +21,29 @@ Copyright (c) 2024 A Curious Clincal Programmer
 """
 import logging
 from pathlib import Path
-import re
-import sys
-from PySide6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QComboBox,
-    QPushButton,
-    QSpinBox,
-    QFileDialog,
-    QTextEdit,
-)
+from PySide6 import QtWidgets
 from PySide6.QtCore import QTimer, Qt, QEvent
 from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import serial
 import threading
 import time
 import pandas as pd
-from matplotlib.lines import Line2D
 import serial.tools.list_ports as list_ports
-import darkdetect
 
-# Setup Logging
-Path("logs").mkdir(exist_ok=True)
-logging_format = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-logging.basicConfig(
-    level=logging.INFO,
-    format=logging_format,
-    filename=Path("logs/log.log"),
-)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(
-    logging.Formatter(
-        logging_format
-    )
-)
-logging.getLogger().addHandler(console_handler)
-logging.getLogger("PIL").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
+from setup_scripts import setup_functions as my_setup
+from setup_scripts.helper_functions import TextHandler, save_timeseries, calculate_2D_matrix, process_serial_data
 
-# Ensure suggested python version
-try:
-    with open(".python-version", "r") as f:
-        version_str = f.read().strip()
-        SUGGESTED_PY_VERSION = tuple(map(int, version_str.split(".")))
-except FileNotFoundError as e:
-    logging.error(f"Could not find .python-version file. Using default version (3.14.2). Error: {e}")
-    SUGGESTED_PY_VERSION = (3, 14, 2)
-if (sys.version_info.major, sys.version_info.minor, sys.version_info.micro) != SUGGESTED_PY_VERSION:
-    logging.warning(
-        f"This script is designed for Python {SUGGESTED_PY_VERSION[0]}.{SUGGESTED_PY_VERSION[1]}.{SUGGESTED_PY_VERSION[2]}"
-        f" (current: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}) might cause unexpected behavior or errors."
-        f" If errors occur, run 'uv sync', or update to the suggested python version."
-    )
-
-
-# Set Matplotlib theme based on the OS theme
-print(plt.style.available)
-if darkdetect.isDark():
-    plt.style.use(
-        "https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-dark.mplstyle"
-    )
-else:
-    plt.style.use("ggplot")
-
+my_setup.verify_python_version()
+my_setup.initialize_logging()
+my_setup.setup_theme()
 
 def main() -> None:
     """Main function to set up the GUI and start the application."""
-    app = QApplication([])
-    main_window = QMainWindow()
+    app = QtWidgets.QApplication([])
+    main_window = QtWidgets.QMainWindow()
     main_window.setWindowTitle("Serial Data Viewer")
     main_window.resize(1000, 800)
     model = Model()
@@ -171,6 +118,26 @@ class Controller:
 
     def save_snapshot(self):
         """Save the current snapshot to a file."""
+        def save_fcn(df):
+            filters = (
+                    "Excel files (*.xlsx);;"
+                    "CSV files (*.csv);;"
+                    "JSON files (*.json);;"
+                    "All files (*.*)"
+                )
+            file_path, selected_filter = QtWidgets.QFileDialog.getSaveFileName(
+                    None,
+                    "Save Timeseries",
+                    "",
+                    filters,
+                )
+            if not file_path:
+                return  # User cancelled
+            path = Path(file_path)
+            save_timeseries(path, df, selected_filter)
+
+            
+
         if self.is_running:
             self.snapshot_show()
             QTimer.singleShot(0, self.save_snapshot)
@@ -182,7 +149,7 @@ class Controller:
             logging.error("Nothing to save, unfreezing.")
             logging.warning("Attempted to save an empty snapshot.")
             return
-        QTimer.singleShot(1, lambda: save_timeseries(df))
+        QTimer.singleShot(1, lambda: save_fcn(df))
 
     @property
     def is_running(self):
@@ -190,15 +157,15 @@ class Controller:
         return not self.is_frozen
 
 
-class View(QWidget):
+class View(QtWidgets.QWidget):
     """View class to manage the graphical user interface."""
 
     lines: list[Line2D] = []
 
-    def __init__(self, master: QMainWindow) -> None:
+    def __init__(self, master: QtWidgets.QMainWindow) -> None:
         super().__init__(master)
         self.master = master
-        self.setLayout(QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.setup_ui()
 
     def on_key_press(self, event: QKeyEvent):
@@ -220,47 +187,47 @@ class View(QWidget):
     def setup_ui(self):
         """Set up the UI elements."""
 
-        control_layout = QHBoxLayout()
+        control_layout = QtWidgets.QHBoxLayout()
         main_layout = self.layout()
-        assert isinstance(main_layout, QVBoxLayout)
+        assert isinstance(main_layout, QtWidgets.QVBoxLayout)
         main_layout.addLayout(control_layout)
 
-        selection_layout = QVBoxLayout()
+        selection_layout = QtWidgets.QVBoxLayout()
         control_layout.addLayout(selection_layout)
 
-        keybindings_layout = QVBoxLayout()
+        keybindings_layout = QtWidgets.QVBoxLayout()
         control_layout.addLayout(keybindings_layout)
 
         keybindings_layout.addWidget(
-            QLabel(
+            QtWidgets.QLabel(
                 "Key Bindings:\n\t[Space]: Freeze / Unfreeze\n\t[S]: Save data to file"
             )
         )
 
-        lbl = QLabel("Select COM Port:")
+        lbl = QtWidgets.QLabel("Select COM Port:")
         selection_layout.addWidget(lbl)
 
-        self.port = QComboBox()
+        self.port = QtWidgets.QComboBox()
         selection_layout.addWidget(self.port)
 
-        lbl = QLabel("Select Baudrate:")
+        lbl = QtWidgets.QLabel("Select Baudrate:")
         selection_layout.addWidget(lbl)
 
         BAUDRATE_OPTIONS = [9600, 115200, 256000, 512000, 921600]
-        self.baudrate = QComboBox()
+        self.baudrate = QtWidgets.QComboBox()
         self.baudrate.addItems(list(map(str, BAUDRATE_OPTIONS)))
         self.baudrate.setCurrentText(str(BAUDRATE_OPTIONS[-1]))
         selection_layout.addWidget(self.baudrate)
 
-        lbl = QLabel("Select Number of samples (per channel):")
+        lbl = QtWidgets.QLabel("Select Number of samples (per channel):")
         selection_layout.addWidget(lbl)
 
-        self.samples_per_channel = QSpinBox(
+        self.samples_per_channel = QtWidgets.QSpinBox(
             minimum=10, maximum=100000, singleStep=100, value=2000
         )
         selection_layout.addWidget(self.samples_per_channel)
 
-        self.connect_button = QPushButton("Connect")
+        self.connect_button = QtWidgets.QPushButton("Connect")
         self.connect_button.clicked.connect(self.on_connect)
         selection_layout.addWidget(self.connect_button)
 
@@ -364,32 +331,13 @@ class View(QWidget):
         self.samples_per_channel.setEnabled(False)
 
     def setup_logger(self):
-        """Set up the logging system to write to the QTextEdit widget."""
+        """Set up the logging system to write to the QtWidgets.QTextEdit widget."""
 
         main_layout = self.layout()
-        assert isinstance(main_layout, QVBoxLayout)
-        self.log_area = QTextEdit()
+        assert isinstance(main_layout, QtWidgets.QVBoxLayout)
+        self.log_area = QtWidgets.QTextEdit()
         self.log_area.setReadOnly(True)
         main_layout.addWidget(self.log_area)
-
-        # Create a custom logging handler
-        class TextHandler(logging.Handler):
-            def __init__(self, widget: QTextEdit):
-                super().__init__()
-                self.widget = widget
-
-            def emit(self, record):
-                if not self.widget.isVisible():
-                    return
-                log_entry = self.format(record)
-                self.widget.append(log_entry)
-                self.widget.verticalScrollBar().setValue(
-                    self.widget.verticalScrollBar().maximum()
-                )
-
-            # Destructor, remember to remove self from the logger
-            def __del__(self):
-                logging.getLogger().removeHandler(self)
 
         text_handler = text_handler = TextHandler(self.log_area)
         text_handler.setFormatter(
@@ -397,7 +345,6 @@ class View(QWidget):
         )
 
         logging.getLogger().addHandler(text_handler)
-
 
 class Model:
     """Model class to handle data and serial communication."""
@@ -557,94 +504,7 @@ class Model:
         """Destructor to close the serial connection."""
         self.close_connection()
 
-
-def process_serial_data(ascii_data: str) -> tuple[str, list[list[int]]]:
-    """Process the ASCII data read from the serial connection."""
-    row_asci_data = ascii_data.split("\r\n")
-    if len(row_asci_data) < 3:
-        # Requires at least 3 ready samples, to process. otherwise return all samples as rest
-        return ascii_data, []
-
-    rest = row_asci_data[-1]  # Last row is rest
-    data = row_asci_data[:-2]
-    data_filtered = filter(str_contains_only_numbers, data)
-    data_integers = list(map(str_to_intarray, data_filtered))
-    return rest, data_integers
-
-
-def str_contains_only_numbers(row: str) -> bool:
-    """Check if a string contains only numbers and spaces."""
-    if not row:
-        return False
-    return bool(re.fullmatch(r"\s*\d+( \d+)*\s*", row))
-
-
-def str_to_intarray(data: str) -> list[int]:
-    """Convert a string of numbers separated by spaces to a list of integers."""
-    return list(map(int, data.split()))
-
-
-def calculate_2D_matrix(data: list[list[int]]) -> tuple[int, int]:
-    """Calculate the number of rows and columns in a 2D matrix."""
-    num_rows = len(data)
-    num_cols = len(data[0]) if num_rows else 0
-    return num_rows, num_cols
-
-
-def save_timeseries(df: pd.DataFrame):
-    filters = (
-        "Excel files (*.xlsx);;"
-        "CSV files (*.csv);;"
-        "JSON files (*.json);;"
-        "All files (*.*)"
-    )
-
-    file_path, selected_filter = QFileDialog.getSaveFileName(
-        None,
-        "Save Timeseries",
-        "",
-        filters,
-    )
-
-    if not file_path:
-        return  # User cancelled
-
-    path = Path(file_path)
-
-    # Extract extension from selected filter, e.g. "*.xlsx" -> ".xlsx"
-    if selected_filter:
-        ext = selected_filter.split("(")[1].split(")")[0].replace("*", "").strip()
-    else:
-        ext = path.suffix
-
-    # Ensure the file has an extension
-    if not path.suffix and ext:
-        path = path.with_suffix(ext)
-
-    ext = path.suffix.lower()
-
-    # Map extensions to writers
-    writers = {
-        ".csv": lambda p: df.to_csv(p, index=True, index_label="index"),
-        ".xlsx": lambda p: df.to_excel(p, index=True, index_label="index"),
-        ".json": lambda p: df.reset_index()
-        .rename(columns={"index": "index"})
-        .to_json(p, orient="records", lines=True),
-    }
-
-    writer = writers.get(ext)
-    if not writer:
-        logging.error(f"Unsupported file extension: {ext}")
-        return
-
-    writer(path)
-    logging.info(f"Data saved to {path}")
-
-
 if __name__ == "__main__":
-
-    
-
     logging.info("Starting Serial Recorder...")
     main()
     logging.info("Exiting...")
