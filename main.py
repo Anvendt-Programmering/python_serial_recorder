@@ -1,4 +1,6 @@
 #!.venv/bin/python
+
+# Et godt spørgsmål
 """
 Python Serial Recorder
 
