@@ -3,6 +3,11 @@
 ```mermaid
 flowchart
     start((Start App))
+
+    fork_stop@{ shape: fork, label: "Fork or Join" }
+    is_running_ui -->|No| fork_stop
+    fork_stop  -. close app .-> stop
+    stop([STOP])
     setup[Create Model, View, Controller]
     wait_loop[Controller.waiting_for_port_selection]
     scan_ports[Model.get_available_ports]
@@ -16,10 +21,8 @@ flowchart
     model_open[Model.open_connection]
     conn_ok{Model is_connected?}
     lock_ui[View.update_ui_elements]
-    start_graph_loop[Controller.update_graph]
-    read_snapshot[Model.get_snapshot]
+    read_snapshot[Get Snapshot from Model]
     render_view[View.display_data]
-    stop([STOP])
 
     start --> setup --> wait_loop --> scan_ports --> detect_esp32
     detect_esp32 -->|Yes| update_dropdown --> keep_waiting --> wait_loop
@@ -30,11 +33,28 @@ flowchart
     connect_btn -->|Yes| port_selected
     port_selected -->|No| wait_loop
     port_selected -->|Yes| open_conn --> model_open --> conn_ok
-
+    is_running_ui{Did User Close UI?}
     conn_ok -->|No| wait_loop
-    conn_ok -->|Yes| lock_ui --> start_graph_loop
-    start_graph_loop --> read_snapshot --> render_view --> start_graph_loop
-    lock_ui -. close app .-> stop
+    conn_ok -->|Yes| fork1 
+    fork1@{ shape: fork, label: "Fork or Join" }
+    
+    is_running_ui -->|Yes| read_snapshot
+    read_snapshot --> render_view --> is_running_ui
+    fork1 --> lock_ui --> is_running_ui 
+
+    fork1 --> is_running_data 
+    is_running_data -->|Yes| read_data
+    read_data[read Available raw data from ESP32] --> update_buffer
+    update_buffer[Update Buffer in Model] 
+    update_buffer --> user_frozen
+    user_frozen{Did user freeze UI?} -->|No| update_snapshot
+    user_frozen -->|Yes| fork_frozen
+    fork_frozen@{ shape: fork, label: "Fork or Join" }
+    fork_frozen --> is_running_data
+    update_snapshot[Update Snapshot in Model] --> fork_frozen
+    is_running_data{Did User Close UI? }
+    is_running_data -->|No| fork_stop
+
 ```
 
 ## MVC Class Diagram
